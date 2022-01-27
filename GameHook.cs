@@ -10,6 +10,13 @@ using MemTools;
 
 namespace SS4SS {
   static class GameHook {
+    private const string SS4_PROC_NAME = "Sam4";
+    private const string SSSM_PROC_NAME = "SamSM";
+    private static readonly string[] ALL_PROC_NAMES = new string[] {
+      SS4_PROC_NAME,
+      SSSM_PROC_NAME,
+    };
+
     private static MemManager manager = null;
     private static Pointer statsPtr = null;
     public static bool IsHooked => manager != null && manager.IsHooked && statsPtr != null;
@@ -23,29 +30,33 @@ namespace SS4SS {
       }
     }
 
-    public static bool TryHook() {
-      foreach (Process p in Process.GetProcessesByName("Sam4")) {
-        manager = new MemManager(p);
+    public static bool IsSS4 => manager?.HookedProcess?.ProcessName == SS4_PROC_NAME;
 
-        try {
-          IntPtr ptr = manager.SigScan(
-            p.MainModule.BaseAddress,
-            p.MainModule.ModuleMemorySize,
-            12,
-            "FF 92 80000000",       // call qword ptr [rdx+00000080]
-            "44 8B E0",             // mov r12d,eax
-            "48 8B 0D ????????"     // mov rcx,[Sam4.exe+2242138]       <----
-          );
-          if (ptr == IntPtr.Zero) {
+    public static bool TryHook() {
+      foreach (string procName in ALL_PROC_NAMES) {
+        foreach (Process p in Process.GetProcessesByName(procName)) {
+          manager = new MemManager(p);
+
+          try {
+            IntPtr ptr = manager.SigScan(
+              p.MainModule.BaseAddress,
+              p.MainModule.ModuleMemorySize,
+              12,
+              "FF 92 80000000",       // call qword ptr [rdx+00000080]
+              "44 8B E0",             // mov r12d,eax
+              "48 8B 0D ????????"     // mov rcx,[Sam4.exe+2242138]       <----
+            );
+            if (ptr == IntPtr.Zero) {
+              continue;
+            }
+
+            Int64 baseAddr = ptr.ToInt64() + 4 + manager.Read<Int32>(ptr);
+            statsPtr = new Pointer(new IntPtr(baseAddr), 0x0, 0x10, 0x238, IsSS4 ? 0x1e0 : 0x1e8, 0x0);
+            break;
+
+          } catch (Win32Exception) {
             continue;
           }
-
-          Int64 baseAddr = ptr.ToInt64() + 4 + manager.Read<Int32>(ptr);
-          statsPtr = new Pointer(new IntPtr(baseAddr), 0x0, 0x10, 0x238, 0x1e0, 0x0);
-          break;
-
-        } catch (Win32Exception) {
-          continue;
         }
       }
       return IsHooked;

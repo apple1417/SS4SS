@@ -11,11 +11,19 @@ using System.Windows.Forms;
 
 namespace SS4SS {
   public partial class MainForm : Form {
+    private const string SS4Title = "SS4 Stats";
+    private const string SSSMTitle = "SSSM Stats";
+
+    private static readonly Color SS4Colour = Color.FromArgb(0xFF, 0xAA, 0x00);
+    private static readonly Color SSSMColour = Color.FromArgb(0x02, 0xAC, 0xFF);
+
     private static readonly int[] UPDATE_OPTIONS = new int[] {
       1, 5, 10, 17, 50, 100, 500, 1000
     };
     private int updateMS = UPDATE_OPTIONS[2];
     private readonly Timer updateTimer;
+
+    private List<Label> colourUpdatingLabels = new List<Label>();
 
     public MainForm() {
       InitializeComponent();
@@ -26,6 +34,9 @@ namespace SS4SS {
       FontFamily fira = FontManager.Load(Properties.Resources.FiraSans_Medium);
       foreach (Label l in statTable.Controls) {
         l.Font = new Font(fira, l.Font.Size, l.Font.Style);
+        if (l.ForeColor != Color.White) {
+          colourUpdatingLabels.Add(l);
+        }
       }
       UpdateFontSize();
 
@@ -105,6 +116,8 @@ namespace SS4SS {
       if (!GameHook.IsHooked) {
         if (GameHook.TryHook()) {
           notHookedLabel.Visible = false;
+          colourUpdatingLabels.ForEach(l => l.ForeColor = GameHook.IsSS4 ? SS4Colour : SSSMColour);
+          Text = GameHook.IsSS4 ? SS4Title : SSSMTitle;
         } else {
           notHookedLabel.Visible = true;
           return;
